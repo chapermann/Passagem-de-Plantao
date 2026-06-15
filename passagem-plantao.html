@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Passagem de Plantão · UTI / Sala Vermelha</title>
+<style>
+  :root {
+    --bg:       #0a0e12;
+    --surface:  #111720;
+    --border:   #1e2a38;
+    --green:    #00e5a0;
+    --amber:    #f5a623;
+    --red:      #e05454;
+    --blue:     #4ab3f4;
+    --text:     #c8d6e5;
+    --muted:    #556070;
+    --white:    #eaf2ff;
+    --font-ui:  'Inter', system-ui, sans-serif;
+    --font-mono:'JetBrains Mono', 'Courier New', monospace;
+  }
+
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 14px;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── Sidebar ── */
+  #sidebar {
+    width: 220px;
+    min-width: 220px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  #sidebar-header {
+    padding: 16px 14px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  #sidebar-header .logo {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--green);
+    margin-bottom: 2px;
+  }
+
+  #sidebar-header h1 {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--white);
+    line-height: 1.3;
+  }
+
+  #bed-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+  }
+
+  .bed-section-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 10px 14px 4px;
+  }
+
+  .bed-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+    transition: background .15s, border-color .15s;
+    user-select: none;
+  }
+
+  .bed-item:hover { background: rgba(255,255,255,.04); }
+
+  .bed-item.active {
+    background: rgba(0,229,160,.07);
+    border-left-color: var(--green);
+  }
+
+  .bed-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+    flex-shrink: 0;
+    transition: background .2s;
+  }
+
+  .bed-dot.done  { background: var(--green); }
+  .bed-dot.pend  { background: var(--amber); }
+  .bed-dot.draft { background: var(--blue);  }
+
+  .bed-label {
+    font-size: 12px;
+    color: var(--text);
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .bed-item.active .bed-label { color: var(--white); font-weight: 500; }
+
+  #sidebar-footer {
+    padding: 12px 14px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  #copy-all-btn {
+    width: 100%;
+    background: rgba(0,229,160,.12);
+    color: var(--green);
+    border: 1px solid rgba(0,229,160,.3);
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background .15s;
+  }
+
+  #copy-all-btn:hover { background: rgba(0,229,160,.2); }
+
+  #save-txt-btn {
+    width: 100%;
+    background: rgba(75,179,244,.08);
+    color: var(--blue);
+    border: 1px solid rgba(75,179,244,.25);
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background .15s;
+  }
+
+  #save-txt-btn:hover { background: rgba(75,179,244,.18); }
+
+  /* ── Main panel ── */
+  #main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  #topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  #topbar .bed-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--white);
+    flex: 1;
+  }
+
+  #topbar .badge {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+
+  .badge-vermelha { background: rgba(224,84,84,.15); color: var(--red);   border: 1px solid rgba(224,84,84,.3); }
+  .badge-retaguarda{ background: rgba(245,166,35,.12); color: var(--amber); border: 1px solid rgba(245,166,35,.3); }
+
+  #content-area {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* ── Input column ── */
+  #input-col {
+    width: 44%;
+    min-width: 320px;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 20px;
+    gap: 14px;
+  }
+
+  .field-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  .field-input {
+    width: 100%;
+    background: #0d1520;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--white);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    padding: 7px 10px;
+    outline: none;
+    transition: border-color .15s;
+  }
+
+  .field-input:focus { border-color: var(--green); }
+
+  .field-input::placeholder { color: var(--muted); }
+
+  #evolucao-area {
+    width: 100%;
+    background: #0d1520;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--white);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 10px;
+    resize: vertical;
+    min-height: 180px;
+    outline: none;
+    line-height: 1.6;
+    transition: border-color .15s;
+  }
+
+  #evolucao-area:focus { border-color: var(--green); }
+  #evolucao-area::placeholder { color: var(--muted); font-style: italic; }
+
+  #generate-btn {
+    width: 100%;
+    padding: 11px;
+    background: var(--green);
+    color: #001a10;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity .15s;
+    letter-spacing: .03em;
+  }
+
+  #generate-btn:hover { opacity: .88; }
+  #generate-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  #clear-btn {
+    width: 100%;
+    padding: 8px;
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: color .15s, border-color .15s;
+  }
+
+  #clear-btn:hover { color: var(--text); border-color: var(--text); }
+
+  /* ── Output column ── */
+  #output-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  #output-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  #output-toolbar span {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    flex: 1;
+  }
+
+  .copy-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--text);
+    font-size: 11px;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: background .15s;
+  }
+
+  .copy-btn:hover { background: rgba(255,255,255,.06); }
+
+  #output-text {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.75;
+    color: var(--white);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  #output-text .streaming-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 14px;
+    background: var(--green);
+    animation: blink .7s step-end infinite;
+    vertical-align: text-bottom;
+    margin-left: 1px;
+  }
+
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  .placeholder-msg {
+    color: var(--muted);
+    font-family: var(--font-ui);
+    font-style: italic;
+    font-size: 13px;
+    text-align: center;
+    margin-top: 60px;
+    line-height: 1.7;
+  }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--surface);
+    border: 1px solid var(--green);
+    color: var(--green);
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity .25s, transform .25s;
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  #toast.show { opacity: 1; transform: translateY(0); }
+
+  /* ── Status indicator ── */
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 6px;
+  }
+
+  .status-dot.generating { background: var(--amber); animation: pulse 1s infinite; }
+  .status-dot.done       { background: var(--green); }
+  .status-dot.idle       { background: var(--muted); }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  /* ── API Key config ── */
+  #api-modal {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.7);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #api-modal.open { display: flex; }
+
+  .modal-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 28px;
+    width: 440px;
+    max-width: 90vw;
+  }
+
+  .modal-box h2 { font-size: 15px; color: var(--white); margin-bottom: 6px; }
+  .modal-box p  { font-size: 12px; color: var(--muted); margin-bottom: 16px; line-height: 1.5; }
+
+  .modal-box input {
+    width: 100%;
+    background: #0d1520;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--white);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 8px 10px;
+    outline: none;
+    margin-bottom: 12px;
+  }
+
+  .modal-box input:focus { border-color: var(--green); }
+
+  .modal-actions { display: flex; gap: 8px; }
+
+  .btn-primary {
+    flex: 1;
+    padding: 9px;
+    background: var(--green);
+    color: #001a10;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .btn-secondary {
+    padding: 9px 16px;
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  #config-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 5px;
+    font-size: 11px;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: color .15s;
+  }
+
+  #config-btn:hover { color: var(--text); }
+</style>
+</head>
+<body>
+
+<!-- ── Sidebar ── -->
+<aside id="sidebar">
+  <div id="sidebar-header">
+    <div class="logo">HMMC · UTI / SV</div>
+    <h1>Passagem de Plantão</h1>
+  </div>
+
+  <div id="bed-list">
+    <div class="bed-section-label">Sala Vermelha</div>
+    <!-- Leitos SV 1–11 gerados por JS -->
+
+    <div class="bed-section-label" style="margin-top:4px">Retaguarda do Trauma</div>
+    <!-- Leitos RT 1–6 gerados por JS -->
+  </div>
+
+  <div id="sidebar-footer">
+    <button id="copy-all-btn">⊞ Copiar Todos os Casos</button>
+    <button id="save-txt-btn">↓ Salvar em TXT</button>
+  </div>
+</aside>
+
+<!-- ── Main ── -->
+<main id="main">
+  <div id="topbar">
+    <span class="bed-title" id="topbar-title">Selecione um leito</span>
+    <span class="badge" id="topbar-badge"></span>
+    <button id="config-btn">⚙ API</button>
+  </div>
+
+  <div id="content-area">
+
+    <!-- Input -->
+    <div id="input-col">
+      <div>
+        <div class="field-label">Leito</div>
+        <input class="field-input" id="f-leito" placeholder="Ex.: Vermelha 3" readonly>
+      </div>
+      <div>
+        <div class="field-label">Evolução Médica do Prontuário</div>
+        <textarea id="evolucao-area" placeholder="Cole aqui a evolução médica..."></textarea>
+      </div>
+
+      <button id="generate-btn">▶ Gerar Passagem de Plantão</button>
+      <button id="clear-btn">Limpar campo</button>
+    </div>
+
+    <!-- Output -->
+    <div id="output-col">
+      <div id="output-toolbar">
+        <span>
+          <span class="status-dot idle" id="status-dot"></span>
+          <span id="status-label">Aguardando</span>
+        </span>
+        <button class="copy-btn" id="copy-case-btn">Copiar este caso</button>
+      </div>
+      <div id="output-text">
+        <div class="placeholder-msg">Insira a evolução médica e pressione<br><strong>Gerar Passagem de Plantão</strong>.</div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- API Modal -->
+<div id="api-modal">
+  <div class="modal-box">
+    <h2>Configuração da API</h2>
+    <p>Informe a chave da API DeepSeek. A chave é armazenada apenas na memória desta sessão e não é enviada a nenhum servidor externo além do endpoint oficial da DeepSeek.</p>
+    <input type="password" id="api-key-input" placeholder="sk-...">
+    <div class="modal-actions">
+      <button class="btn-primary" id="save-api-btn">Salvar</button>
+      <button class="btn-secondary" id="cancel-api-btn">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+const BEDS = [
+  ...Array.from({length:11}, (_,i) => ({ id:`SV${i+1}`, label:`Vermelha ${i+1}`, type:'vermelha' })),
+  ...Array.from({length:6},  (_,i) => ({ id:`RT${i+1}`, label:`Retaguarda ${i+1}`, type:'retaguarda' })),
+];
+
+const state = {
+  currentBed: null,
+  cases: {},         // id -> { text, status }
+  apiKey: '',
+  generating: false,
+};
+
+// ── Build sidebar ──────────────────────────────────────────────────────────
+function buildSidebar() {
+  const list = document.getElementById('bed-list');
+  list.innerHTML = '';
+
+  let lastType = null;
+  BEDS.forEach(bed => {
+    if (bed.type !== lastType) {
+      lastType = bed.type;
+      const lbl = document.createElement('div');
+      lbl.className = 'bed-section-label';
+      lbl.textContent = bed.type === 'vermelha' ? 'Sala Vermelha' : 'Retaguarda do Trauma';
+      list.appendChild(lbl);
+    }
+    const item = document.createElement('div');
+    item.className = 'bed-item';
+    item.dataset.id = bed.id;
+    item.innerHTML = `<span class="bed-dot" id="dot-${bed.id}"></span>
+                      <span class="bed-label">${bed.label}</span>`;
+    item.addEventListener('click', () => selectBed(bed.id));
+    list.appendChild(item);
+  });
+}
+
+function updateDot(id) {
+  const dot = document.getElementById(`dot-${id}`);
+  if (!dot) return;
+  const c = state.cases[id];
+  dot.className = 'bed-dot';
+  if (!c) return;
+  if (c.status === 'done')  dot.classList.add('done');
+  if (c.status === 'draft') dot.classList.add('draft');
+  if (c.status === 'pend')  dot.classList.add('pend');
+}
+
+// ── Select bed ─────────────────────────────────────────────────────────────
+function selectBed(id) {
+  if (state.generating) return;
+  state.currentBed = id;
+  document.querySelectorAll('.bed-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.id === id);
+  });
+
+  const bed = BEDS.find(b => b.id === id);
+  document.getElementById('topbar-title').textContent = bed.label;
+  const badge = document.getElementById('topbar-badge');
+  badge.textContent = bed.type === 'vermelha' ? 'Sala Vermelha' : 'Retaguarda do Trauma';
+  badge.className = 'badge ' + (bed.type === 'vermelha' ? 'badge-vermelha' : 'badge-retaguarda');
+  document.getElementById('f-leito').value = bed.label;
+
+  // Restore output
+  const c = state.cases[id];
+  const outputEl = document.getElementById('output-text');
+  if (c?.text) {
+    outputEl.textContent = c.text;
+  } else {
+    outputEl.innerHTML = '<div class="placeholder-msg">Insira a evolução médica e pressione<br><strong>Gerar Passagem de Plantão</strong>.</div>';
+  }
+  setStatus('idle');
+}
+
+// ── Generate ───────────────────────────────────────────────────────────────
+const SYSTEM_PROMPT = `Você é um assistente médico de passagem de plantão. Siga rigorosamente as instruções:
+
+1. NUNCA armazene, repita nem exiba dados que identifiquem o paciente (nome, CPF, data de nascimento, número de prontuário, endereço). Refira-se sempre ao leito.
+2. Gere a passagem de plantão com base no modelo abaixo. Máximo absoluto de 50 palavras por caso, excluindo o cabeçalho estruturado.
+3. Seja formal, técnico, sem emojis, sem abreviações não padronizadas, sem gírias.
+4. Não ofereça sugestões de conduta além das já definidas no prontuário. Registre apenas o que foi decidido.
+5. Se não houver descrição de peso, assuma 75 kg.
+6. Se houver critérios de alta da UTI/Sala Vermelha descritos no texto, informe: "Preenche critérios de alta para enfermaria."
+7. Reforce sempre a necessidade de definição de condutas quando não houver registro de decisão.
+8. Se houver informação sobre status de reanimação cardiopulmonar, registre claramente.
+
+MODELO OBRIGATÓRIO DE SAÍDA:
+────────────────────────────
+[LEITO]
+Motivo de internação: ...
+Dias internados: ...
+Ventilação: ...
+Hemodinâmica: Estável / Instável
+Pontos de atenção: ...
+Pendências: ...
+Definição de conduta / Round: ...
+Status de reanimação: ...
+────────────────────────────
+Resumo objetivo (máx. 50 palavras):
+...
+────────────────────────────`;
+
+async function generatePassagem() {
+  if (!state.currentBed) { showToast('Selecione um leito primeiro.'); return; }
+  if (!state.apiKey)      { openApiModal(); return; }
+
+  const evolucao = document.getElementById('evolucao-area').value.trim();
+  if (!evolucao) { showToast('Insira a evolução médica antes de gerar.'); return; }
+
+  const bed = BEDS.find(b => b.id === state.currentBed);
+  state.generating = true;
+  setStatus('generating', 'Gerando...');
+  document.getElementById('generate-btn').disabled = true;
+
+  const outputEl = document.getElementById('output-text');
+  outputEl.innerHTML = '<span class="streaming-cursor"></span>';
+
+  const userMsg = `Leito: ${bed.label}\n\nEvolução médica:\n${evolucao}`;
+
+  try {
+    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${state.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user',   content: userMsg },
+        ],
+        max_tokens: 700,
+        temperature: 0.2,
+        stream: true,
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error?.message || `HTTP ${response.status}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let fullText = '';
+
+    outputEl.textContent = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split('\n').filter(l => l.startsWith('data: '));
+
+      for (const line of lines) {
+        const data = line.replace('data: ', '').trim();
+        if (data === '[DONE]') break;
+        try {
+          const parsed = JSON.parse(data);
+          const delta = parsed.choices?.[0]?.delta?.content || '';
+          fullText += delta;
+          outputEl.textContent = fullText;
+          outputEl.scrollTop = outputEl.scrollHeight;
+        } catch {}
+      }
+    }
+
+    state.cases[state.currentBed] = { text: fullText, status: 'done' };
+    updateDot(state.currentBed);
+    setStatus('done', 'Concluído');
+  } catch (err) {
+    outputEl.textContent = `Erro ao comunicar com a API:\n${err.message}`;
+    state.cases[state.currentBed] = { text: '', status: 'pend' };
+    updateDot(state.currentBed);
+    setStatus('idle', 'Erro');
+  } finally {
+    state.generating = false;
+    document.getElementById('generate-btn').disabled = false;
+  }
+}
+
+// ── Status ─────────────────────────────────────────────────────────────────
+function setStatus(type, label) {
+  const dot = document.getElementById('status-dot');
+  const lbl = document.getElementById('status-label');
+  dot.className = 'status-dot ' + type;
+  lbl.textContent = label || { idle:'Aguardando', generating:'Gerando...', done:'Concluído' }[type] || '';
+}
+
+// ── Copy / Save ─────────────────────────────────────────────────────────────
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(() => showToast('Copiado para a área de transferência.'));
+}
+
+function copyAllCases() {
+  const parts = BEDS
+    .filter(b => state.cases[b.id]?.text)
+    .map(b => `${'═'.repeat(50)}\n${b.label.toUpperCase()}\n${'═'.repeat(50)}\n${state.cases[b.id].text}`)
+    .join('\n\n');
+  if (!parts) { showToast('Nenhum caso gerado até o momento.'); return; }
+  copyText(parts);
+}
+
+function saveAllTxt() {
+  const parts = BEDS
+    .filter(b => state.cases[b.id]?.text)
+    .map(b => `${'═'.repeat(50)}\n${b.label.toUpperCase()}\n${'═'.repeat(50)}\n${state.cases[b.id].text}`)
+    .join('\n\n');
+  if (!parts) { showToast('Nenhum caso gerado até o momento.'); return; }
+  const now = new Date();
+  const ts = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+  const blob = new Blob([parts], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `passagem_plantao_${ts}.txt`;
+  a.click();
+}
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+function showToast(msg, duration = 2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+// ── API Modal ──────────────────────────────────────────────────────────────
+function openApiModal() {
+  document.getElementById('api-key-input').value = state.apiKey;
+  document.getElementById('api-modal').classList.add('open');
+}
+
+function closeApiModal() {
+  document.getElementById('api-modal').classList.remove('open');
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+buildSidebar();
+
+document.getElementById('generate-btn').addEventListener('click', generatePassagem);
+document.getElementById('clear-btn').addEventListener('click', () => {
+  document.getElementById('evolucao-area').value = '';
+  document.getElementById('evolucao-area').focus();
+});
+document.getElementById('copy-all-btn').addEventListener('click', copyAllCases);
+document.getElementById('save-txt-btn').addEventListener('click', saveAllTxt);
+document.getElementById('copy-case-btn').addEventListener('click', () => {
+  const txt = document.getElementById('output-text').textContent;
+  if (txt && !txt.includes('Insira a evolução')) copyText(txt);
+  else showToast('Nenhum caso gerado neste leito.');
+});
+document.getElementById('config-btn').addEventListener('click', openApiModal);
+document.getElementById('save-api-btn').addEventListener('click', () => {
+  state.apiKey = document.getElementById('api-key-input').value.trim();
+  closeApiModal();
+  if (state.apiKey) showToast('Chave API salva para esta sessão.');
+});
+document.getElementById('cancel-api-btn').addEventListener('click', closeApiModal);
+document.getElementById('api-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('api-modal')) closeApiModal();
+});
+
+// Prompt inicial da chave
+window.addEventListener('load', () => {
+  // Tenta carregar chave salva na sessão (sessionStorage, sem persistência entre abas)
+  const saved = sessionStorage.getItem('ds_api_key');
+  if (saved) { state.apiKey = saved; }
+  document.getElementById('save-api-btn').addEventListener('click', () => {
+    if (state.apiKey) sessionStorage.setItem('ds_api_key', state.apiKey);
+  });
+
+  // Seleciona o primeiro leito por default
+  selectBed('SV1');
+});
+</script>
+</body>
+</html>
