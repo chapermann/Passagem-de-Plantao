@@ -343,6 +343,23 @@
     </span>
   </div>
 
+  <!-- API KEY CARD -->
+  <div class="input-card" id="apikey-card" style="margin-bottom:16px;">
+    <div class="input-header" style="margin-bottom:8px;">
+      <div>
+        <div class="section-label" style="margin-bottom:2px;">Configuração — NVIDIA NIM API</div>
+        <div style="font-size:11px;color:var(--text-muted);">Obtenha sua chave gratuita em <a href="https://build.nvidia.com/settings/api-keys" target="_blank" style="color:var(--green-bright);">build.nvidia.com</a> · Chave salva apenas nesta aba do navegador.</div>
+      </div>
+      <div id="api-status" style="font-size:11px;color:var(--text-muted);">● Não configurada</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <input type="password" id="apikey-input" placeholder="nvapi-xxxxxxxxxxxxxxxxxxxx"
+        style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:12px;padding:9px 12px;outline:none;"
+        oninput="salvarApiKey(this.value)" />
+      <button class="btn btn-secondary" style="font-size:11px;white-space:nowrap;" onclick="toggleVerKey()">Mostrar</button>
+    </div>
+  </div>
+
   <!-- STATUS -->
   <div class="status-bar">
     <div class="status-item"><strong id="count-done">0</strong>Casos processados</div>
@@ -549,20 +566,40 @@ async function processarCaso() {
 
   const userMsg = `Leito: ${selectedLeito}\n\nEvolução médica:\n${evolucao}`;
 
+  const apiKey = document.getElementById('apikey-input').value.trim();
+  if (!apiKey || !apiKey.startsWith('nvapi-')) {
+    alert('Insira uma API Key NVIDIA válida (começa com nvapi-) no campo de configuração acima.');
+    btn.disabled = false;
+    btn.textContent = 'Processar Passagem';
+    document.getElementById('output-area').style.display = 'none';
+    return;
+  }
+
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: userMsg }]
+        model: 'meta/llama-3.3-70b-instruct',
+        max_tokens: 600,
+        temperature: 0.2,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: userMsg }
+        ]
       })
     });
 
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.detail || `HTTP ${response.status}`);
+    }
+
     const data = await response.json();
-    const texto = data.content?.find(b => b.type === 'text')?.text || 'Erro ao processar resposta.';
+    const texto = data.choices?.[0]?.message?.content || 'Erro ao processar resposta.';
 
     outputAtual = texto;
     showOutput(texto);
@@ -709,8 +746,32 @@ function switchTab(tab) {
   }
 }
 
+// ─── API KEY ─────────────────────────────────────────────────────────────────
+function salvarApiKey(val) {
+  sessionStorage.setItem('nvidia_key', val);
+  const status = document.getElementById('api-status');
+  if (val.startsWith('nvapi-') && val.length > 20) {
+    status.textContent = '● Configurada';
+    status.style.color = 'var(--green-bright)';
+  } else {
+    status.textContent = '● Não configurada';
+    status.style.color = 'var(--text-muted)';
+  }
+}
+function toggleVerKey() {
+  const inp = document.getElementById('apikey-input');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
 // ─── START ───────────────────────────────────────────────────────────────────
 init();
+
+// Restaurar key da sessão se existir
+const savedKey = sessionStorage.getItem('nvidia_key');
+if (savedKey) {
+  document.getElementById('apikey-input').value = savedKey;
+  salvarApiKey(savedKey);
+}
 </script>
 </body>
 </html>
