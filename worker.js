@@ -3,7 +3,7 @@
 // Passagem de Plantão — Sala Vermelha / Retaguarda do Trauma
 // ============================================================
 // Variável de ambiente necessária (configurar no dashboard):
-//   NVIDIA_API_KEY = nvapi-SUA_CHAVE_AQUI
+//   NVIDIA_API_KEY = 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
 // ============================================================
 
 const NVIDIA_ENDPOINT = 'https://integrate.api.nvidia.com/v1/chat/completions';
